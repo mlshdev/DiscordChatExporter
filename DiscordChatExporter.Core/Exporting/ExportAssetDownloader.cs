@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.RegularExpressions;
@@ -42,9 +43,22 @@ internal partial class ExportAssetDownloader(string workingDirPath, bool reuse)
         await Http.ResiliencePipeline.ExecuteAsync(
             async innerCancellationToken =>
             {
-                // Download the file
-                using var response = await Http.Client.GetAsync(url, innerCancellationToken);
-                await using var output = File.Create(filePath);
+                // Download the file using buffered file stream for better IO performance
+                using var response = await Http.Client.GetAsync(
+                    url,
+                    HttpCompletionOption.ResponseHeadersRead,
+                    innerCancellationToken
+                );
+                response.EnsureSuccessStatusCode();
+
+                await using var output = new FileStream(
+                    filePath,
+                    FileMode.Create,
+                    FileAccess.Write,
+                    FileShare.None,
+                    bufferSize: 81920, // 80KB buffer for optimal IO
+                    FileOptions.Asynchronous | FileOptions.SequentialScan
+                );
                 await response.Content.CopyToAsync(output, innerCancellationToken);
             },
             cancellationToken

@@ -13,7 +13,19 @@ namespace DiscordChatExporter.Core.Utils;
 
 public static class Http
 {
-    public static HttpClient Client { get; } = new();
+    private static readonly SocketsHttpHandler Handler = new()
+    {
+        // Enable connection pooling for better performance
+        PooledConnectionLifetime = TimeSpan.FromMinutes(15),
+        // Keep idle connections alive for longer
+        PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
+        // Increase max connections per server for parallel operations
+        MaxConnectionsPerServer = 20,
+        // Use automatic decompression
+        AutomaticDecompression = DecompressionMethods.All,
+    };
+
+    public static HttpClient Client { get; } = new(Handler);
 
     private static bool IsRetryableStatusCode(HttpStatusCode statusCode) =>
         statusCode is HttpStatusCode.TooManyRequests or HttpStatusCode.RequestTimeout

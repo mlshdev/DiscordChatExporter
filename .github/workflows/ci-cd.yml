@@ -13,8 +13,12 @@ on:
         required: true
         default: true
 
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+
 jobs:
-  build-and-release:
+  build-linux-x64:
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -28,29 +32,122 @@ jobs:
           dotnet-version: "10.0.102"
           dotnet-quality: "preview"
 
-      # GUI Build
-      - name: Publish GUI (Linux x64)
+      - name: Extract version number
+        id: version
+        shell: bash
         run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          # Strip leading 'v' or 'V' if present
+          SEMVER="${VERSION#v}"
+          SEMVER="${SEMVER#V}"
+          echo "semver=$SEMVER" >> "$GITHUB_OUTPUT"
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GUI (Linux x64)
+        shell: bash
+        run: |
+          set -euo pipefail
           dotnet publish DiscordChatExporter.Gui/DiscordChatExporter.Gui.csproj \
             -c Release \
             -r linux-x64 \
             --self-contained true \
             -p:PublishSingleFile=true \
-            -p:Version=${{ inputs.version }} \
-            -o release/gui
+            -p:Version=${{ steps.version.outputs.semver }} \
+            -o release/gui-linux-x64
 
-      # Packaging
-      - name: Package Artifacts
+      - name: Package Artifacts (Linux x64)
+        shell: bash
         run: |
-          cd release/gui && zip -r ../../DiscordChatExporter.Gui.linux-x64.zip . && cd ../..
+          set -euo pipefail
+          cd release/gui-linux-x64 && zip -r ../../DiscordChatExporter.Gui.linux-x64.zip . && cd ../..
 
-      # Create Release (Optional)
+      - name: Upload Linux x64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiscordChatExporter.Gui.linux-x64
+          path: DiscordChatExporter.Gui.linux-x64.zip
+          if-no-files-found: error
+
+  build-macos-arm64:
+    runs-on: macos-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Install .NET 10
+        uses: actions/setup-dotnet@v5.1.0
+        with:
+          dotnet-version: "10.0.102"
+          dotnet-quality: "preview"
+
+      - name: Extract version number
+        id: version
+        shell: bash
+        run: |
+          set -euo pipefail
+          VERSION="${{ inputs.version }}"
+          # Strip leading 'v' or 'V' if present
+          SEMVER="${VERSION#v}"
+          SEMVER="${SEMVER#V}"
+          echo "semver=$SEMVER" >> "$GITHUB_OUTPUT"
+          echo "tag=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GUI (macOS arm64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          dotnet publish DiscordChatExporter.Gui/DiscordChatExporter.Gui.csproj \
+            -c Release \
+            -r osx-arm64 \
+            --self-contained true \
+            -p:PublishSingleFile=true \
+            -p:Version=${{ steps.version.outputs.semver }} \
+            -o release/gui-macos-arm64
+
+      - name: Package Artifacts (macOS arm64)
+        shell: bash
+        run: |
+          set -euo pipefail
+          cd release/gui-macos-arm64 && zip -r ../../DiscordChatExporter.Gui.macos-arm64.zip . && cd ../..
+
+      - name: Upload macOS arm64 Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: DiscordChatExporter.Gui.macos-arm64
+          path: DiscordChatExporter.Gui.macos-arm64.zip
+          if-no-files-found: error
+
+  release:
+    needs: [build-linux-x64, build-macos-arm64]
+    if: ${{ inputs.create_release }}
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v6
+
+      - name: Download Linux x64 Artifact
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: DiscordChatExporter.Gui.linux-x64
+
+      - name: Download macOS arm64 Artifact
+        uses: actions/download-artifact@v4.1.8
+        with:
+          name: DiscordChatExporter.Gui.macos-arm64
+
       - name: Create Release
-        if: ${{ inputs.create_release }}
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        shell: bash
         run: |
+          set -euo pipefail
           gh release create "${{ inputs.version }}" \
             --title "${{ inputs.version }}" \
-            --notes "Manual build for version ${{ inputs.version }}" \
-            DiscordChatExporter.Gui.linux-x64.zip
+            --notes "Build for version ${{ inputs.version }}" \
+            DiscordChatExporter.Gui.linux-x64.zip \
+            DiscordChatExporter.Gui.macos-arm64.zip
