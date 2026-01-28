@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text;
@@ -10,7 +10,7 @@ public class UrlBuilder
 {
     private string _path = "";
 
-    private readonly Dictionary<string, string?> _queryParameters = new(
+    private readonly OrderedDictionary<string, string?> _queryParameters = new(
         StringComparer.OrdinalIgnoreCase
     );
 
