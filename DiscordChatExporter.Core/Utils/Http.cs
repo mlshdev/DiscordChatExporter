@@ -21,10 +21,6 @@ public static class Http
         PooledConnectionIdleTimeout = TimeSpan.FromMinutes(2),
         // Increase max connections per server for parallel operations
         MaxConnectionsPerServer = 20,
-        // Enable keep-alive for HTTP/1.1
-        KeepAlivePingPolicy = HttpKeepAlivePingPolicy.WithActiveRequests,
-        KeepAlivePingTimeout = TimeSpan.FromSeconds(15),
-        KeepAlivePingDelay = TimeSpan.FromSeconds(60),
         // Use automatic decompression
         AutomaticDecompression = DecompressionMethods.All,
     };
